@@ -49,11 +49,7 @@ Depending on the specific notebooks and scripts included in this folder, the imp
 The finite element method typically starts from the weak form:
 
 $$
-\int_{\Omega}
-\nabla \delta u \cdot \nabla u \, d\Omega
-=
-\int_{\Omega}
-\delta u \, f \, d\Omega
+\int_{\Omega} \nabla \delta u \cdot \nabla u \, d\Omega = \int_{\Omega} \delta u \, f \, d\Omega
 $$
 
 where:
