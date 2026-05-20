@@ -1,155 +1,169 @@
-# Dugdale Cohesive Zone and User Element FEM Examples
+# Abaqus VUMAT — McCormick-Type Viscoplastic Material Model
 
-Finite element implementations for cohesive-zone modeling and nonlinear fracture mechanics.
+This folder contains an Abaqus/Explicit `VUMAT` implementation for a McCormick-type viscoplastic constitutive model.
 
-This folder contains MATLAB and/or Abaqus user-element related examples exploring Dugdale-type cohesive behavior and nonlinear fracture processes.
-
-The implementations focus on:
-
-- cohesive zone mechanics
-- traction-separation behavior
-- nonlinear fracture modeling
-- interface failure
-- custom finite element formulations
+The code was originally developed for EN2340 finite element analysis coursework. It demonstrates how to implement a user-defined material model in Abaqus/Explicit using Fortran.
 
 ---
 
-# Background
+# Files
 
-The Dugdale model is one of the classical cohesive-zone models in fracture mechanics.
+```text
+abaqus_vumat_McCormick.for
+```
 
-Instead of assuming an infinitely sharp crack tip singularity, the Dugdale approach introduces a finite yielding or cohesive zone ahead of the crack tip.
+A Fortran `VUMAT` subroutine for Abaqus/Explicit.
 
-This regularizes the stress singularity and provides a physically meaningful fracture process region.
+```text
+Readme.md
+```
 
-The model is widely used in:
-
-- ductile fracture
-- interface delamination
-- adhesive failure
-- cohesive finite element methods
-- nonlinear crack propagation
+Brief documentation for this example.
 
 ---
 
-# Governing Idea
+# Model Overview
 
-The cohesive zone introduces a traction-separation relationship:
+The subroutine implements an elastic-viscoplastic material update with internal state variables.
 
-$$
-T = T(\delta)
-$$
+The material response includes:
 
-where:
+- isotropic elasticity
+- deviatoric stress update
+- equivalent von Mises stress calculation
+- plastic strain increment update
+- Newton-Raphson iteration for the plastic correction
+- history-dependent internal variables
 
-- $T$ is the cohesive traction
-- $\delta$ is the displacement jump across the interface
-
-In the Dugdale idealization, the cohesive traction is often approximated as a constant yield traction:
-
-$$
-T = \sigma_Y
-$$
-
-inside the cohesive zone.
+The implementation follows the Abaqus/Explicit `VUMAT` interface, where stress and state variables are updated at each material integration point.
 
 ---
 
-# Features
+# State Variables
 
-This implementation includes:
+The implementation stores several history variables:
 
-- nonlinear interface behavior
-- cohesive traction laws
-- user-defined element formulation
-- fracture process zone modeling
-- finite element assembly
-- crack-tip regularization
+```text
+statev(1) = accumulated plastic strain
+statev(2) = internal aging / time-like variable
+statev(3) = previous plastic strain increment
+```
 
-Depending on the specific scripts included in this folder, the implementation may also involve:
-
-- custom user elements (UEL)
-- interface elements
-- iterative nonlinear solution procedures
-- displacement jump calculations
+These variables are updated during the stress integration procedure.
 
 ---
 
-# Numerical Method
+# Material Parameters
 
-The simulations are based on finite element discretization of the solid domain combined with interface constitutive relations.
+The material parameters are passed through `props`:
 
-The global system generally takes the form:
-
-$$
-K(u)\,u = f
-$$
-
-where:
-
-- $K(u)$ is the nonlinear stiffness matrix
-- $u$ is the displacement vector
-- $f$ is the external loading
-
-The cohesive contribution evolves according to the local traction-separation law.
+```fortran
+E      = props(1)   ! Young's modulus
+xnu    = props(2)   ! Poisson's ratio
+Y      = props(3)   ! reference yield stress
+e0     = props(4)   ! reference strain
+m      = props(5)   ! hardening exponent
+edot0  = props(6)   ! reference strain rate
+S      = props(7)   ! stress scale
+H      = props(8)   ! hardening / aging scale
+td     = props(9)   ! characteristic time
+Omega  = props(10)  ! aging parameter
+alfa   = props(11)  ! aging exponent
+```
 
 ---
 
-# Applications
+# Constitutive Update
 
-The framework is relevant to:
+The code first computes the elastic trial stress. The equivalent von Mises stress is then evaluated as:
 
-- fracture mechanics
-- cohesive-zone modeling
-- interface delamination
-- nonlinear solid mechanics
-- crack propagation simulations
+$$
+\sigma_e =
+\sqrt{\frac{3}{2} \, \mathbf{s} : \mathbf{s}}
+$$
 
-Potential applications include:
+where $\mathbf{s}$ is the deviatoric stress tensor.
 
-- thin-film delamination
-- adhesive joints
-- ductile crack growth
-- interface failure in composites
+If the trial response remains elastic, the stress is updated directly. Otherwise, the plastic strain increment is solved iteratively.
+
+---
+
+# Newton-Raphson Plastic Correction
+
+The plastic increment is obtained using a Newton-Raphson iteration.
+
+The nonlinear residual contains contributions from:
+
+- trial equivalent stress
+- elastic unloading due to plastic flow
+- strain hardening
+- rate dependence
+- aging / McCormick-type internal variable evolution
+
+The iteration updates the plastic strain increment until the residual reaches the prescribed tolerance.
+
+---
+
+# Abaqus Usage
+
+This file is intended to be compiled and linked with Abaqus/Explicit as a user material subroutine.
+
+A typical command is:
+
+```bash
+abaqus job=your_job_name user=abaqus_vumat_McCormick.for
+```
+
+The input file should define:
+
+- `*User Material`
+- the 11 material constants listed above
+- the required number of state variables through `*Depvar`
+
+Example structure:
+
+```abaqus
+*User Material, constants=11
+E, nu, Y, e0, m, edot0, S, H, td, Omega, alfa
+
+*Depvar
+3
+```
 
 ---
 
 # Educational Purpose
 
-These examples were developed to explore:
+This example is intended for studying:
 
-- nonlinear fracture mechanics
-- cohesive-zone FEM implementation
-- custom finite element formulations
-- numerical treatment of fracture-process zones
+- Abaqus user material implementation
+- explicit dynamics material updates
+- viscoplastic constitutive modeling
+- Newton-Raphson stress integration
+- history-dependent material behavior
 
-The codes prioritize conceptual clarity and implementation transparency.
+The implementation prioritizes transparency of the constitutive update rather than production-level robustness.
 
 ---
 
-# Possible Extensions
+# Notes
 
-Potential future improvements include:
-
-- exponential cohesive laws
-- bilinear cohesive models
-- mixed-mode fracture
-- adaptive remeshing
-- crack propagation algorithms
-- Abaqus UEL integration
-- implicit Newton-Raphson solvers
-- large deformation cohesive mechanics
+- The code is written for Abaqus/Explicit `VUMAT`.
+- The implementation assumes the Abaqus corotational stress convention.
+- The subroutine is designed for educational and research purposes.
+- Additional testing is recommended before use in production simulations.
 
 ---
 
 # Related Topics
 
-- Cohesive zone model (CZM)
-- Dugdale-Barenblatt model
-- Nonlinear fracture mechanics
-- Interface elements
-- Traction-separation laws
-- Finite element fracture simulation
+- Abaqus VUMAT
+- user-defined material subroutines
+- viscoplasticity
+- McCormick effect
+- dynamic strain aging
+- nonlinear constitutive modeling
+- explicit finite element analysis
 
 ---
 
